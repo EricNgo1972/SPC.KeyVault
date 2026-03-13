@@ -1,0 +1,25 @@
+@SPC.KeyVault_HostAddress = http://localhost:5149
+@ADMIN_API_KEY = change-me
+@CLIENT_API_KEY = change-me
+
+GET {{SPC.KeyVault_HostAddress}}/
+Accept: application/json
+
+###
+
+POST {{SPC.KeyVault_HostAddress}}/admin/secret
+X-API-Key: {{ADMIN_API_KEY}}
+Content-Type: application/json
+
+{
+  "name": "llm",
+  "value": "sk-abc123"
+}
+
+###
+
+GET {{SPC.KeyVault_HostAddress}}/secret/llm
+X-API-Key: {{CLIENT_API_KEY}}
+Accept: application/json
+
+###
