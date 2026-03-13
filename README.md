@@ -21,6 +21,29 @@ Set these environment variables before running:
 - `ADMIN_API_KEY`
 - `CLIENT_API_KEY`
 
+Linux or macOS, current shell session:
+
+```bash
+export ADMIN_API_KEY="your-admin-key"
+export CLIENT_API_KEY="your-client-key"
+dotnet run
+```
+
+Linux or macOS, persistent for the current user:
+
+Add these lines to `~/.bashrc`, `~/.zshrc`, or the shell profile you actually use:
+
+```bash
+export ADMIN_API_KEY="your-admin-key"
+export CLIENT_API_KEY="your-client-key"
+```
+
+Then reload the shell profile or open a new terminal:
+
+```bash
+source ~/.bashrc
+```
+
 PowerShell, current session:
 
 ```powershell
