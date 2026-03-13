@@ -142,7 +142,7 @@ app.MapGet("/", (HttpContext httpContext) =>
         <pre>curl -X POST "{{baseUrl}}/admin/secret" ^
         -H "X-API-Key: &lt;ADMIN_API_KEY&gt;" ^
         -H "Content-Type: application/json" ^
-        -d "{\"name\":\"llm\",\"value\":\"sk-abc123\"}"</pre>
+        -d "[{\"name\":\"llm\",\"value\":\"sk-abc123\"},{\"name\":\"db\",\"value\":\"conn-string\"}]"</pre>
 
         <h2>Client Request</h2>
         <pre>curl "{{baseUrl}}/secret/llm" ^
@@ -164,20 +164,37 @@ app.MapGet("/", (HttpContext httpContext) =>
     return Results.Content(html, "text/html");
 });
 
-app.MapPost("/admin/secret", (HttpContext httpContext, SecretRequest request, SecretStore store) =>
+app.MapPost("/admin/secret", (HttpContext httpContext, List<SecretRequest> requests, SecretStore store) =>
 {
     if (!httpContext.User.IsInRole("admin"))
     {
         return Results.Unauthorized();
     }
 
-    if (string.IsNullOrWhiteSpace(request.Name))
+    if (requests.Count == 0)
     {
-        return Results.BadRequest(new { error = "Secret name is required." });
+        return Results.BadRequest(new { error = "At least one secret is required." });
     }
 
-    store.Set(request.Name, request.Value ?? string.Empty);
-    return Results.Ok(new { name = request.Name, value = request.Value ?? string.Empty });
+    var invalidSecret = requests.FirstOrDefault(request => string.IsNullOrWhiteSpace(request.Name));
+    if (invalidSecret is not null)
+    {
+        return Results.BadRequest(new { error = "Every secret must include a name." });
+    }
+
+    store.SetMany(requests.Select(request => new KeyValuePair<string, string>(
+        request.Name,
+        request.Value ?? string.Empty)));
+
+    return Results.Ok(new
+    {
+        updated = requests.Count,
+        secrets = requests.Select(request => new
+        {
+            name = request.Name,
+            value = request.Value ?? string.Empty
+        })
+    });
 });
 
 app.MapGet("/secret/{name}", (HttpContext httpContext, string name, SecretStore store) =>

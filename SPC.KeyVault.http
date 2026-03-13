@@ -11,10 +11,16 @@ POST {{SPC.KeyVault_HostAddress}}/admin/secret
 X-API-Key: {{ADMIN_API_KEY}}
 Content-Type: application/json
 
-{
-  "name": "llm",
-  "value": "sk-abc123"
-}
+[
+  {
+    "name": "llm",
+    "value": "sk-abc123"
+  },
+  {
+    "name": "db",
+    "value": "Server=.;Database=App;User Id=sa;Password=pass;"
+  }
+]
 
 ###
 

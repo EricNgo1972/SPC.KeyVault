@@ -113,10 +113,16 @@ Content-Type: application/json
 Body:
 
 ```json
-{
-  "name": "llm",
-  "value": "sk-abc123"
-}
+[
+  {
+    "name": "llm",
+    "value": "sk-abc123"
+  },
+  {
+    "name": "db",
+    "value": "Server=.;Database=App;User Id=sa;Password=pass;"
+  }
+]
 ```
 
 Example:
@@ -125,7 +131,7 @@ Example:
 curl -X POST "https://localhost:7298/admin/secret" \
   -H "X-API-Key: your-admin-key" \
   -H "Content-Type: application/json" \
-  -d "{\"name\":\"llm\",\"value\":\"sk-abc123\"}"
+  -d "[{\"name\":\"llm\",\"value\":\"sk-abc123\"},{\"name\":\"db\",\"value\":\"conn-string\"}]"
 ```
 
 ### Get Secret
@@ -166,16 +172,10 @@ This repo includes a GitHub Actions workflow:
 
 Behavior:
 
-- builds on every push and pull request
+- runs manually from the GitHub Actions tab
+- builds the project in Release mode
 - publishes a release artifact zip
-- when a tag like `v1.0.0` is pushed, it creates a GitHub Release and uploads the zip asset
-
-Example tag push:
-
-```bash
-git tag v1.0.0
-git push origin v1.0.0
-```
+- creates a GitHub Release only when the manual run is started from a tag ref like `v1.0.0`
 
 ## Notes
 

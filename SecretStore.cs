@@ -21,6 +21,19 @@ public sealed class SecretStore
         }
     }
 
+    public void SetMany(IEnumerable<KeyValuePair<string, string>> secrets)
+    {
+        lock (_sync)
+        {
+            foreach (var secret in secrets)
+            {
+                _secrets[secret.Key] = secret.Value;
+            }
+
+            SaveSecrets();
+        }
+    }
+
     public bool TryGet(string name, out string? value)
     {
         lock (_sync)
