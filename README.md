@@ -174,8 +174,9 @@ Behavior:
 
 - runs manually from the GitHub Actions tab
 - builds the project in Release mode
-- publishes a release artifact zip
-- creates a GitHub Release only when the manual run is started from a tag ref like `v1.0.0`
+- requires a `release_tag` input like `v1.0.0`
+- creates a GitHub Release from the commit you ran the workflow on
+- attaches the published zip file to that GitHub Release
 
 ## Notes
 
