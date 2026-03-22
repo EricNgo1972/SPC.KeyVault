@@ -57,6 +57,26 @@ public sealed class UiAuthService
             payload.Tenant.TenantId,
             payload.Tenant.TenantRole);
     }
+
+    public async Task<UiActionResult> ForgotPasswordAsync(string email, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            return UiActionResult.Failure("Email is required.");
+        }
+
+        using var response = await _httpClient.PostAsJsonAsync(
+            "/api/auth/forgot-password",
+            new ForgotPasswordRequest(email),
+            cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            return UiActionResult.Failure("Unable to submit forgot password request.");
+        }
+
+        return UiActionResult.Success("If the account exists, a password reset message has been sent.");
+    }
 }
 
 public static class UiClaimTypes
@@ -74,7 +94,15 @@ public sealed record UiLoginResult(bool Succeeded, string? Error, string Email, 
         new(false, error, string.Empty, null, string.Empty, string.Empty);
 }
 
+public sealed record UiActionResult(bool Succeeded, string? Message, string? Error)
+{
+    public static UiActionResult Success(string message) => new(true, message, null);
+
+    public static UiActionResult Failure(string error) => new(false, null, error);
+}
+
 internal sealed record AuthLoginRequest(string Email, string Password);
+internal sealed record ForgotPasswordRequest(string Email);
 
 internal sealed record AuthLoginResponse(
     [property: JsonPropertyName("requiresTenantSelection")] bool RequiresTenantSelection,

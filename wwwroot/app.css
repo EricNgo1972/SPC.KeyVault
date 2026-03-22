@@ -231,12 +231,46 @@ button.secondary {
     border: 1px solid var(--border);
 }
 
+.info-panel.success {
+    background: rgba(34, 197, 94, 0.12);
+    border-color: rgba(34, 197, 94, 0.22);
+    color: #bbf7d0;
+}
+
 .alert,
 .login-error {
     margin-bottom: 18px;
     background: rgba(248, 113, 113, 0.12);
     color: #fecaca;
     border: 1px solid rgba(248, 113, 113, 0.2);
+}
+
+.auth-divider {
+    margin: 20px 0;
+    text-align: center;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-size: 0.8rem;
+}
+
+.form-status {
+    margin-bottom: 18px;
+}
+
+.submit-status {
+    display: none;
+    color: var(--muted);
+    font-size: 0.92rem;
+}
+
+.login-form.is-busy .submit-status {
+    display: block;
+}
+
+.login-form.is-busy button[type="submit"] {
+    opacity: 0.8;
+    cursor: wait;
 }
 
 .summary-grid,

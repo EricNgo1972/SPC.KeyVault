@@ -161,6 +161,22 @@ app.MapPost("/ui/login", async Task<IResult> (
     return Results.LocalRedirect(SanitizeReturnUrl(request.ReturnUrl));
 }).AllowAnonymous().DisableAntiforgery().ExcludeFromDescription();
 
+app.MapPost("/ui/forgot-password", async Task<IResult> (
+    HttpContext httpContext,
+    [FromForm] UiForgotPasswordRequest request,
+    UiAuthService authService) =>
+{
+    var result = await authService.ForgotPasswordAsync(request.Email ?? string.Empty, httpContext.RequestAborted);
+    if (!result.Succeeded)
+    {
+        var error = Uri.EscapeDataString(result.Error ?? "Unable to submit forgot password request.");
+        return Results.LocalRedirect($"/ui/login?forgotError={error}");
+    }
+
+    var message = Uri.EscapeDataString(result.Message ?? "Forgot password request submitted.");
+    return Results.LocalRedirect($"/ui/login?forgotMessage={message}");
+}).AllowAnonymous().DisableAntiforgery().ExcludeFromDescription();
+
 app.MapPost("/ui/logout", async Task<IResult> (HttpContext httpContext) =>
 {
     await httpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
@@ -392,3 +408,5 @@ internal sealed record SecretRequest(string Name, string Value);
 internal sealed record CreateApiKeyRequest(string Category, int? ExpiryDays);
 
 internal sealed record UiLoginRequest(string? Email, string? Password, string? ReturnUrl);
+
+internal sealed record UiForgotPasswordRequest(string? Email);

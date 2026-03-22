@@ -16,7 +16,17 @@
             <div class="login-error">@Error</div>
         }
 
-        <form method="post" action="/ui/login" class="login-form">
+        @if (!string.IsNullOrWhiteSpace(ForgotMessage))
+        {
+            <div class="info-panel form-status success">@ForgotMessage</div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(ForgotError))
+        {
+            <div class="login-error form-status">@ForgotError</div>
+        }
+
+        <form id="sign-in-form" method="post" action="/ui/login" class="login-form" data-busy-text="Signing in...">
             <AntiforgeryToken />
             <input type="hidden" name="returnUrl" value="@ResolvedReturnUrl" />
 
@@ -31,9 +41,57 @@
             </label>
 
             <button type="submit" class="primary">Sign in</button>
+            <div class="submit-status" aria-live="polite"></div>
+        </form>
+
+        <div class="auth-divider">or</div>
+
+        <form id="forgot-password-form" method="post" action="/ui/forgot-password" class="login-form" data-busy-text="Submitting forgot password...">
+            <AntiforgeryToken />
+
+            <label>
+                <span>Forgot password email</span>
+                <input name="email" type="email" autocomplete="email" required />
+            </label>
+
+            <button type="submit" class="secondary">Forgot password</button>
+            <div class="submit-status" aria-live="polite"></div>
         </form>
     </div>
 </div>
+
+<script>
+    (() => {
+        const wireSubmitState = (formId) => {
+            const form = document.getElementById(formId);
+            if (!form || form.dataset.busyBound === "true") {
+                return;
+            }
+
+            form.dataset.busyBound = "true";
+            form.addEventListener("submit", () => {
+                const button = form.querySelector("button[type='submit']");
+                const status = form.querySelector(".submit-status");
+                const busyText = form.dataset.busyText || "Submitting...";
+
+                form.classList.add("is-busy");
+
+                if (button) {
+                    button.disabled = true;
+                    button.dataset.originalText = button.textContent || "";
+                    button.textContent = busyText;
+                }
+
+                if (status) {
+                    status.textContent = busyText;
+                }
+            });
+        };
+
+        wireSubmitState("sign-in-form");
+        wireSubmitState("forgot-password-form");
+    })();
+</script>
 
 @code {
     [SupplyParameterFromQuery]
@@ -41,6 +99,12 @@
 
     [SupplyParameterFromQuery]
     public string? ReturnUrl { get; set; }
+
+    [SupplyParameterFromQuery]
+    public string? ForgotMessage { get; set; }
+
+    [SupplyParameterFromQuery]
+    public string? ForgotError { get; set; }
 
     private string ResolvedReturnUrl => string.IsNullOrWhiteSpace(ReturnUrl) ? "/ui" : ReturnUrl!;
 
