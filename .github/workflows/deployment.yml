@@ -28,10 +28,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: "8.0.x"
 
@@ -54,7 +54,7 @@ jobs:
           esac
 
       - name: Restore
-        run: dotnet restore SPC.KeyVault.csproj
+        run: dotnet restore SPC.KeyVault.csproj --runtime "${{ steps.names.outputs.runtime_id }}"
 
       - name: Build
         run: dotnet build SPC.KeyVault.csproj --configuration Release --runtime "${{ steps.names.outputs.runtime_id }}" --no-restore
