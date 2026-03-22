@@ -7,6 +7,23 @@ Accept: application/json
 
 ###
 
+POST {{SPC.KeyVault_HostAddress}}/admin/apikey
+X-API-Key: {{ADMIN_API_KEY}}
+Content-Type: application/json
+
+{
+  "category": "client",
+  "expiryDays": 30
+}
+
+###
+
+GET {{SPC.KeyVault_HostAddress}}/admin/apikey
+X-API-Key: {{ADMIN_API_KEY}}
+Accept: application/json
+
+###
+
 POST {{SPC.KeyVault_HostAddress}}/admin/secret
 X-API-Key: {{ADMIN_API_KEY}}
 Content-Type: application/json
@@ -25,6 +42,25 @@ Content-Type: application/json
 ###
 
 GET {{SPC.KeyVault_HostAddress}}/secret/llm
+X-API-Key: {{CLIENT_API_KEY}}
+Accept: application/json
+
+###
+
+POST {{SPC.KeyVault_HostAddress}}/admin/secret/app
+X-API-Key: {{ADMIN_API_KEY}}
+Content-Type: application/json
+
+[
+  {
+    "name": "llm",
+    "value": "sk-abc123"
+  }
+]
+
+###
+
+GET {{SPC.KeyVault_HostAddress}}/secret/app/llm
 X-API-Key: {{CLIENT_API_KEY}}
 Accept: application/json
 

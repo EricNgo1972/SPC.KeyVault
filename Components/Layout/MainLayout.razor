@@ -1,0 +1,85 @@
+@implements IDisposable
+@inherits LayoutComponentBase
+@inject NavigationManager NavigationManager
+
+<div class="shell">
+    <aside class="sidebar">
+        <div class="sidebar-title-block">
+            <p class="eyebrow">SPC KeyVault</p>
+            <div class="sidebar-title">Secret Administration</div>
+        </div>
+
+        <nav class="nav-links">
+            <a href="/" class="@GetNavClass("/", false)">Service Health</a>
+            <a href="/swagger" class="@GetNavClass("/swagger", true)">Swagger</a>
+
+            <AuthorizeView Policy="SpcAdmin">
+                <Authorized>
+                    <a href="/ui" class="@GetNavClass("/ui", false)">Manage Secrets</a>
+                    <a href="/ui/apikeys" class="@GetNavClass("/ui/apikeys", true)">Manage API Keys</a>
+                </Authorized>
+            </AuthorizeView>
+        </nav>
+
+        <AuthorizeView>
+            <Authorized>
+                <div class="sidebar-footer">
+                    <div class="muted">Signed in as</div>
+                    <div>@context.User.Identity?.Name</div>
+                    <form method="post" action="/ui/logout" class="logout-form">
+                        <AntiforgeryToken />
+                        <button type="submit" class="button secondary">Sign out</button>
+                    </form>
+                </div>
+            </Authorized>
+            <NotAuthorized>
+                <div class="sidebar-footer">
+                    <div class="muted">Tenant SPC admin access only</div>
+                </div>
+            </NotAuthorized>
+        </AuthorizeView>
+    </aside>
+
+    <main class="content">
+        @Body
+    </main>
+</div>
+
+@code {
+    protected override void OnInitialized()
+    {
+        NavigationManager.LocationChanged += OnLocationChanged;
+    }
+
+    private string GetNavClass(string href, bool includeChildren)
+    {
+        var path = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
+        var currentPath = $"/{path}".TrimEnd('/');
+        if (string.IsNullOrEmpty(currentPath))
+        {
+            currentPath = "/";
+        }
+
+        var normalizedHref = href.TrimEnd('/');
+        if (string.IsNullOrEmpty(normalizedHref))
+        {
+            normalizedHref = "/";
+        }
+
+        var isActive = includeChildren
+            ? currentPath == normalizedHref || currentPath.StartsWith($"{normalizedHref}/", StringComparison.OrdinalIgnoreCase)
+            : currentPath == normalizedHref;
+
+        return isActive ? "active" : string.Empty;
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        NavigationManager.LocationChanged -= OnLocationChanged;
+    }
+}

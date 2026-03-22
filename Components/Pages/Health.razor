@@ -1,0 +1,201 @@
+@page "/"
+@attribute [AllowAnonymous]
+@layout MainLayout
+@inject SecretStore SecretStore
+@inject ApiKeyStore ApiKeyStore
+@inject EventLogService EventLogService
+@inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Service Health</PageTitle>
+
+<div class="page">
+<div class="hero">
+    <div>
+        <div class="meta">Service Health</div>
+        <h2>SPC KeyVault</h2>
+        <p>Monitor service readiness, storage connectivity, and data volume from one page.</p>
+    </div>
+    <div class="hero-actions">
+        @if (!IsUiAdmin)
+        {
+            <a class="button primary" href="/ui/login">Login</a>
+        }
+    </div>
+</div>
+
+@if (ConfigurationNotes.Count > 0)
+{
+    <div class="warn panel-note">
+        <b>Configuration Required</b><br />
+        @foreach (var note in ConfigurationNotes)
+        {
+            <div>@note</div>
+        }
+    </div>
+}
+else
+{
+    <div class="info-panel">
+        <b>Configuration</b><br />
+        Secret storage, API keys, and the admin UI are loaded.
+    </div>
+}
+
+<h2>Service Data Summary</h2>
+<div class="summary-grid">
+    <div class="summary-card">
+        <span class="label">Secrets</span>
+        <strong>@(SecretSummary.IsAvailable ? SecretSummary.SecretCount.ToString() : "-")</strong>
+        <p>@(SecretSummary.IsAvailable ? $"{SecretSummary.CategoryCount} categories" : SecretSummary.Error)</p>
+    </div>
+    <div class="summary-card">
+        <span class="label">API Keys</span>
+        <strong>@(ApiKeySummary.IsAvailable ? ApiKeySummary.TotalCount.ToString() : "-")</strong>
+        <p>@(ApiKeySummary.IsAvailable ? $"{ApiKeySummary.ActiveCount} active" : ApiKeySummary.Error)</p>
+    </div>
+    <div class="summary-card">
+        <span class="label">Admin Keys</span>
+        <strong>@(ApiKeySummary.IsAvailable ? ApiKeySummary.AdminCount.ToString() : "-")</strong>
+        <p>@(ApiKeySummary.IsAvailable ? $"{ApiKeySummary.ClientCount} client keys" : string.Empty)</p>
+    </div>
+    <div class="summary-card">
+        <span class="label">Events</span>
+        <strong>@(EventLogSummary.IsAvailable ? EventLogSummary.TotalCount.ToString() : "-")</strong>
+        <p>@(EventLogSummary.IsAvailable ? $"{EventLogSummary.QueuedCount} queued" : EventLogSummary.Error)</p>
+        <button type="button" class="button secondary compact" @onclick="ToggleLatestEventsAsync" disabled="@(!EventLogSummary.IsAvailable)">
+            @(ShowLatestEvents ? "Hide latest events" : "Show latest events")
+        </button>
+    </div>
+</div>
+
+@if (ShowLatestEvents)
+{
+    <div class="panel">
+        <div class="page-head inline-head">
+            <div>
+                <h2>Latest Events</h2>
+                <p class="muted">Most recent 50 entries from Azure Table <code>eventlogs</code>.</p>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(EventListError))
+        {
+            <div class="alert">@EventListError</div>
+        }
+        else if (LatestEvents.Count == 0)
+        {
+            <div class="empty-state">No event logs found.</div>
+        }
+        else
+        {
+            <div class="table-shell">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Logged At</th>
+                            <th>Event</th>
+                            <th>Role</th>
+                            <th>Key</th>
+                            <th>Secret</th>
+                            <th>IP</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var log in LatestEvents)
+                        {
+                            <tr>
+                                <td>@FormatTimestamp(log.LoggedAt)</td>
+                                <td><code>@log.EventType</code></td>
+                                <td>@(string.IsNullOrWhiteSpace(log.CallerRole) ? "-" : log.CallerRole)</td>
+                                <td>@(string.IsNullOrWhiteSpace(log.CallerKeyPreview) ? "-" : log.CallerKeyPreview)</td>
+                                <td>@(string.IsNullOrWhiteSpace(log.SecretName) ? "-" : log.SecretName)</td>
+                                <td>@(string.IsNullOrWhiteSpace(log.CallerIp) ? "-" : log.CallerIp)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+}
+
+<h2>Access</h2>
+<ul class="access-list">
+    <li>Keys in category <code>admin</code> can create or update secrets and manage API keys</li>
+    <li>Keys in category <code>client</code> can read secrets</li>
+    <li>Tenant <code>SPC</code> admins authenticated by <code>auth.phoebus.asia</code> can use the Blazor UI</li>
+</ul>
+</div>
+
+@code {
+    private ApiKeyStoreStatus ApiKeyStatus { get; set; } = new(false, false, "Loading...");
+    private SecretSummaryResult SecretSummary { get; set; } = SecretSummaryResult.Unavailable("Loading...");
+    private ApiKeySummaryResult ApiKeySummary { get; set; } = ApiKeySummaryResult.Unavailable("Loading...");
+    private EventLogSummaryResult EventLogSummary { get; set; } = EventLogSummaryResult.Unavailable("Loading...");
+    private List<string> ConfigurationNotes { get; set; } = [];
+    private List<EventLogListItem> LatestEvents { get; set; } = [];
+    private bool IsReady { get; set; }
+    private bool IsUiAdmin { get; set; }
+    private bool ShowLatestEvents { get; set; }
+    private string? EventListError { get; set; }
+    private string StatusText { get; set; } = "Starting";
+    private string ConfigurationStatus { get; set; } = "Checking services";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        IsUiAdmin = user.Identity?.IsAuthenticated == true &&
+            user.HasClaim(claim => claim.Type == UiClaimTypes.TenantId && claim.Value == "SPC") &&
+            user.HasClaim(claim => claim.Type == UiClaimTypes.TenantRole && claim.Value == "Admin");
+
+        ApiKeyStatus = ApiKeyStore.GetStatus();
+        SecretSummary = SecretStore.GetSummary();
+        ApiKeySummary = ApiKeyStore.GetSummary();
+        EventLogSummary = EventLogService.GetSummary();
+
+        ConfigurationNotes = [];
+        if (!SecretStore.IsAvailable)
+        {
+            ConfigurationNotes.Add(SecretStore.StatusMessage);
+        }
+
+        if (!ApiKeyStatus.IsAvailable)
+        {
+            ConfigurationNotes.Add(ApiKeyStatus.StatusMessage);
+        }
+
+        IsReady = SecretStore.IsAvailable &&
+            ApiKeyStatus.IsAvailable;
+
+        StatusText = IsReady ? "Running" : "Attention";
+        ConfigurationStatus = IsReady ? "Ready" : "Storage configuration required";
+    }
+
+    private Task ToggleLatestEventsAsync()
+    {
+        ShowLatestEvents = !ShowLatestEvents;
+        if (!ShowLatestEvents)
+        {
+            return Task.CompletedTask;
+        }
+
+        var result = EventLogService.ListLatest(50);
+        if (!result.IsAvailable)
+        {
+            EventListError = result.Error;
+            LatestEvents = [];
+            return Task.CompletedTask;
+        }
+
+        EventListError = null;
+        LatestEvents = result.Events.ToList();
+        return Task.CompletedTask;
+    }
+
+    private static string FormatTimestamp(DateTimeOffset value)
+    {
+        return value.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
+    }
+}

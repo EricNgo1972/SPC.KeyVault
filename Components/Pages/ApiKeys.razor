@@ -1,0 +1,229 @@
+@page "/ui/apikeys"
+@attribute [Authorize(Policy = "SpcAdmin")]
+@layout MainLayout
+@inject ApiKeyStore ApiKeyStore
+
+<PageTitle>API Keys</PageTitle>
+
+<div class="page">
+<div class="page-head">
+    <div>
+        <h2>API Keys</h2>
+        <p class="muted">Maintain admin and client <code>X-API-Key</code> values used by the secret store API.</p>
+    </div>
+
+    <button class="button primary" @onclick="OpenCreateModal">New API key</button>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(ErrorMessage))
+{
+    <div class="alert">@ErrorMessage</div>
+}
+
+@if (ApiKeyItems.Count == 0)
+{
+    <div class="empty-state">No API keys found.</div>
+}
+else
+{
+    <div class="table-shell">
+        <table>
+            <thead>
+                <tr>
+                    <th>Category</th>
+                    <th>Key</th>
+                    <th>Status</th>
+                    <th>Issued</th>
+                    <th>Expiry</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var apiKey in ApiKeyItems)
+                {
+                    var isRevealed = RevealedKeys.Contains(apiKey.Key);
+
+                    <tr>
+                        <td>@FormatCategory(apiKey.Category)</td>
+                        <td class="value-cell">
+                            <code>@(isRevealed ? apiKey.Key : apiKey.KeyPreview)</code>
+                            <button class="button secondary compact" @onclick="() => ToggleReveal(apiKey.Key)">
+                                @(isRevealed ? "Hide" : "Show")
+                            </button>
+                        </td>
+                        <td>
+                            <span class="status-chip @(apiKey.IsActive ? "active" : "inactive")">
+                                @(apiKey.IsActive ? "Active" : "Inactive")
+                            </span>
+                        </td>
+                        <td>@FormatTimestamp(apiKey.IssuedDate)</td>
+                        <td>@FormatOptionalTimestamp(apiKey.ExpiryDate)</td>
+                        <td>
+                            <button class="button secondary compact"
+                                    @onclick="() => ToggleApiKeyAsync(apiKey)"
+                                    disabled="@IsSaving">
+                                @(apiKey.IsActive ? "Deactivate" : "Activate")
+                            </button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@if (IsModalOpen)
+{
+    <div class="modal-backdrop" @onclick="CloseModal">
+        <div class="modal-card" @onclick:stopPropagation="true">
+            <div class="modal-head">
+                <h3>New API key</h3>
+                <button class="button secondary compact" @onclick="CloseModal">Close</button>
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(ModalErrorMessage))
+            {
+                <div class="alert">@ModalErrorMessage</div>
+            }
+
+            <EditForm Model="CreateModel" OnValidSubmit="CreateApiKeyAsync">
+                <div class="form-grid">
+                    <label>
+                        <span>Category</span>
+                        <InputSelect @bind-Value="CreateModel.Category">
+                            <option value="client">client</option>
+                            <option value="admin">admin</option>
+                        </InputSelect>
+                    </label>
+
+                    <label>
+                        <span>Expiry days</span>
+                        <InputNumber @bind-Value="CreateModel.ExpiryDays" placeholder="No expiry" />
+                    </label>
+                </div>
+
+                <p class="hint">Use <code>admin</code> for secret-write and key-management calls. Use <code>client</code> for secret-read calls.</p>
+
+                <div class="modal-actions">
+                    <button type="button" class="button secondary" @onclick="CloseModal">Cancel</button>
+                    <button type="submit" class="button primary" disabled="@IsSaving">Create</button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+</div>
+
+@code {
+    private readonly HashSet<string> RevealedKeys = new(StringComparer.Ordinal);
+    private List<ApiKeyManagementListItem> ApiKeyItems { get; set; } = [];
+    private bool IsModalOpen { get; set; }
+    private bool IsSaving { get; set; }
+    private string? ErrorMessage { get; set; }
+    private string? ModalErrorMessage { get; set; }
+    private CreateApiKeyModel CreateModel { get; set; } = new();
+
+    protected override void OnInitialized()
+    {
+        LoadApiKeys();
+    }
+
+    private void LoadApiKeys()
+    {
+        var result = ApiKeyStore.ListForManagement();
+        if (!result.IsAvailable)
+        {
+            ErrorMessage = result.Error;
+            ApiKeyItems = [];
+            return;
+        }
+
+        ErrorMessage = null;
+        ApiKeyItems = result.ApiKeys.ToList();
+    }
+
+    private void OpenCreateModal()
+    {
+        ModalErrorMessage = null;
+        IsModalOpen = true;
+        CreateModel = new CreateApiKeyModel();
+    }
+
+    private void CloseModal()
+    {
+        IsModalOpen = false;
+        ModalErrorMessage = null;
+        IsSaving = false;
+    }
+
+    private Task CreateApiKeyAsync()
+    {
+        IsSaving = true;
+        ModalErrorMessage = null;
+
+        var createResult = ApiKeyStore.Create(CreateModel.Category, CreateModel.ExpiryDays);
+        if (createResult.IsInvalid || !createResult.Succeeded)
+        {
+            ModalErrorMessage = createResult.Error ?? "Unable to create API key.";
+            IsSaving = false;
+            return Task.CompletedTask;
+        }
+
+        CloseModal();
+        LoadApiKeys();
+        if (!string.IsNullOrWhiteSpace(createResult.ApiKey))
+        {
+            RevealedKeys.Add(createResult.ApiKey);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private Task ToggleApiKeyAsync(ApiKeyManagementListItem apiKey)
+    {
+        IsSaving = true;
+        ErrorMessage = null;
+
+        var result = ApiKeyStore.SetActive(apiKey.Category, apiKey.Key, !apiKey.IsActive);
+        if (!result.Succeeded)
+        {
+            ErrorMessage = result.Error ?? (result.IsNotFound ? "API key not found." : "Unable to update API key.");
+            IsSaving = false;
+            return Task.CompletedTask;
+        }
+
+        LoadApiKeys();
+        IsSaving = false;
+        return Task.CompletedTask;
+    }
+
+    private void ToggleReveal(string key)
+    {
+        if (!RevealedKeys.Add(key))
+        {
+            RevealedKeys.Remove(key);
+        }
+    }
+
+    private static string FormatCategory(string category)
+    {
+        return string.Equals(category, "admin", StringComparison.OrdinalIgnoreCase) ? "Admin" : "Client";
+    }
+
+    private static string FormatTimestamp(DateTimeOffset? value)
+    {
+        return value?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss") ?? "-";
+    }
+
+    private static string FormatOptionalTimestamp(DateTimeOffset? value)
+    {
+        return value.HasValue ? FormatTimestamp(value) : "Never";
+    }
+
+    private sealed class CreateApiKeyModel
+    {
+        public string Category { get; set; } = "client";
+
+        public int? ExpiryDays { get; set; } = 365;
+    }
+}

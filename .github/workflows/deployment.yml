@@ -4,9 +4,17 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: "Release tag to create, for example v1.0.0"
+        description: "Release tag to create"
         required: true
         type: string
+      build_target:
+        description: "Publish target platform"
+        required: true
+        default: linux
+        type: choice
+        options:
+          - linux
+          - windows
 
 permissions:
   contents: write
@@ -16,6 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       RELEASE_TAG: ${{ inputs.release_tag }}
+      BUILD_TARGET: ${{ inputs.build_target }}
 
     steps:
       - name: Checkout
@@ -29,21 +38,41 @@ jobs:
       - name: Resolve artifact name
         id: names
         run: |
-          echo "artifact_name=SPC.KeyVault-${RELEASE_TAG}" >> "$GITHUB_OUTPUT"
+          case "${BUILD_TARGET}" in
+            linux)
+              echo "runtime_id=linux-x64" >> "$GITHUB_OUTPUT"
+              echo "artifact_name=SPC.KeyVault-${RELEASE_TAG}-linux-x64" >> "$GITHUB_OUTPUT"
+              ;;
+            windows)
+              echo "runtime_id=win-x64" >> "$GITHUB_OUTPUT"
+              echo "artifact_name=SPC.KeyVault-${RELEASE_TAG}-win-x64" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "Unsupported build_target: ${BUILD_TARGET}" >&2
+              exit 1
+              ;;
+          esac
 
       - name: Restore
         run: dotnet restore SPC.KeyVault.csproj
 
       - name: Build
-        run: dotnet build SPC.KeyVault.csproj --configuration Release --no-restore
+        run: dotnet build SPC.KeyVault.csproj --configuration Release --runtime "${{ steps.names.outputs.runtime_id }}" --no-restore
 
       - name: Publish
-        run: dotnet publish SPC.KeyVault.csproj --configuration Release --no-build --output ./publish
+        run: dotnet publish SPC.KeyVault.csproj --configuration Release --runtime "${{ steps.names.outputs.runtime_id }}" --self-contained false --no-build --output ./publish
 
       - name: Archive publish output
         run: |
           cd publish
           zip -r "../${{ steps.names.outputs.artifact_name }}.zip" .
+
+      - name: Reject existing release tag
+        run: |
+          if git rev-parse --verify "refs/tags/${RELEASE_TAG}" >/dev/null 2>&1; then
+            echo "Tag '${RELEASE_TAG}' already exists. Choose a new release_tag." >&2
+            exit 1
+          fi
 
       - name: Create GitHub release
         env:

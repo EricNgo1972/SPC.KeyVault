@@ -1,0 +1,57 @@
+@page "/ui/login"
+@attribute [AllowAnonymous]
+@layout MainLayout
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavigationManager
+
+<PageTitle>Login</PageTitle>
+
+<div class="page narrow">
+    <div class="panel">
+        <h2>Tenant SPC Admin Login</h2>
+        <p class="muted">Sign in with your auth.phoebus.asia account. Only active admins of tenant <b>SPC</b> can access this UI.</p>
+
+        @if (!string.IsNullOrWhiteSpace(Error))
+        {
+            <div class="login-error">@Error</div>
+        }
+
+        <form method="post" action="/ui/login" class="login-form">
+            <AntiforgeryToken />
+            <input type="hidden" name="returnUrl" value="@ResolvedReturnUrl" />
+
+            <label>
+                <span>Email</span>
+                <input name="email" type="email" autocomplete="username" required />
+            </label>
+
+            <label>
+                <span>Password</span>
+                <input name="password" type="password" autocomplete="current-password" required />
+            </label>
+
+            <button type="submit" class="primary">Sign in</button>
+        </form>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromQuery]
+    public string? Error { get; set; }
+
+    [SupplyParameterFromQuery]
+    public string? ReturnUrl { get; set; }
+
+    private string ResolvedReturnUrl => string.IsNullOrWhiteSpace(ReturnUrl) ? "/ui" : ReturnUrl!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        if (authState.User.Identity?.IsAuthenticated == true &&
+            authState.User.HasClaim(claim => claim.Type == UiClaimTypes.TenantId && claim.Value == "SPC") &&
+            authState.User.HasClaim(claim => claim.Type == UiClaimTypes.TenantRole && claim.Value == "Admin"))
+        {
+            NavigationManager.NavigateTo(ResolvedReturnUrl, forceLoad: true);
+        }
+    }
+}
