@@ -88,6 +88,70 @@ Open the Blazor admin UI:
 https://localhost:7298/ui
 ```
 
+## Run As A Service
+
+The app now supports both Windows Service hosting and Linux `systemd` hosting.
+
+### Windows Service
+
+Publish the app:
+
+```powershell
+dotnet publish -c Release -o .\publish
+```
+
+Create the service:
+
+```powershell
+sc.exe create "SPC.KeyVault" binPath= "\"C:\path\to\publish\SPC.KeyVault.exe\"" start= auto
+```
+
+Set the required environment variable for the service account before starting the service:
+
+```powershell
+[System.Environment]::SetEnvironmentVariable("STORAGE_CONNECTION_STRING", "UseDevelopmentStorage=true", "Machine")
+```
+
+Then start it:
+
+```powershell
+sc.exe start "SPC.KeyVault"
+```
+
+### Linux `systemd`
+
+Publish the app:
+
+```bash
+dotnet publish -c Release -o ./publish
+```
+
+Create `/etc/systemd/system/spc-keyvault.service`:
+
+```ini
+[Unit]
+Description=SPC.KeyVault
+After=network.target
+
+[Service]
+WorkingDirectory=/opt/spc-keyvault
+ExecStart=/opt/spc-keyvault/SPC.KeyVault
+Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment=STORAGE_CONNECTION_STRING=UseDevelopmentStorage=true
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Copy the published files to `/opt/spc-keyvault`, then enable and start the service:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now spc-keyvault
+```
+
 ## Authentication
 
 All API requests must send this header:

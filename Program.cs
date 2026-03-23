@@ -1,14 +1,22 @@
 using System.Security.Claims;
 using System.Threading.RateLimiting;
+
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.OpenApi.Models;
+
 using SPC.KeyVault.Components;
 
 var builder = WebApplication.CreateBuilder(args);
+
+
+builder.Host.UseWindowsService();
+
+builder.Host.UseSystemd();
+
 
 var azureStorage = builder.Configuration["STORAGE_CONNECTION_STRING"];
 var missingConfig = new List<string>();
